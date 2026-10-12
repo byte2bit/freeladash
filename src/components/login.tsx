@@ -1,0 +1,18 @@
+"use client";
+import { useEffect, useState } from "react";
+import { signIn } from "next-auth/react";
+import { ArrowRight, ChartNoAxesCombined, Check, Layers3, Loader2 } from "lucide-react";
+export function Login({googleEnabled}:{googleEnabled:boolean}) {
+  const [register,setRegister]=useState(false); const [error,setError]=useState(''); const [busy,setBusy]=useState(false);
+  useEffect(()=>{if(new URLSearchParams(location.search).has('error'))setError('Não foi possível concluir o login. Tente novamente ou entre com email e senha.');},[]);
+  async function submit(e:React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();setBusy(true);setError('');const values=Object.fromEntries(new FormData(e.currentTarget));
+    try {
+      if (register) { const response=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});const body=await response.json();if(!response.ok) throw new Error(body.error); }
+      const result=await signIn('credentials',{email:values.email,password:values.password,redirect:false});
+      if(result?.error) throw new Error('Email ou senha inválidos. Confira os dados ou tente mais tarde.');
+      window.location.href='/';
+    }catch(e){setError(e instanceof Error?e.message:'Não foi possível entrar.');setBusy(false);}
+  }
+  return <div className="login-page"><section className="login-story"><a className="brand" href="/login"><span className="brand-mark"><ChartNoAxesCombined size={22}/></span>freela<span>dash</span><i/></a><div><span className="eyebrow">MENOS PLANILHA. MAIS LIBERDADE.</span><h1>Seu talento merece<br/>uma rotina mais leve.</h1><p>Organize o trabalho. Acompanhe suas horas.<br/>Receba pelo que você faz.</p><div className="login-points">{['Todos os seus clientes, em um só lugar','Horas registradas sem complicação','Cobranças prontas no fim do mês'].map(t=><span key={t}><Check size={17}/>{t}</span>)}</div><div className="story-card"><Layers3 size={30}/><div><strong>Espaço para fazer o que você ama.</strong><span>A organização fica com o FreelaDash.</span></div></div></div><small>Feito para quem trabalha por conta própria.</small></section><section className="login-form"><div><span className="pill">SEU ESCRITÓRIO, SIMPLIFICADO</span><h2>{register?'Comece sua nova rotina.':'Bom ter você de volta.'}</h2><p>{register?'Crie sua conta e organize seu próximo projeto.':'Entre para colocar o trabalho em dia.'}</p><form onSubmit={submit}>{register&&<label>Seu nome<input name="name" autoComplete="name" required minLength={2} maxLength={120} placeholder="Como podemos chamar você?"/></label>}<label>Email<input name="email" type="email" autoComplete="email" required placeholder="voce@exemplo.com"/></label><label>Senha<input name="password" type="password" autoComplete={register?'new-password':'current-password'} required minLength={8} maxLength={128} placeholder="Ao menos 8 caracteres"/></label>{error&&<p className="form-error" role="alert">{error}</p>}<button className="button primary" disabled={busy}>{busy?<Loader2 className="spin" size={18}/>:<>{register?'Criar minha conta':'Entrar no FreelaDash'}<ArrowRight size={18}/></>}</button></form>{googleEnabled&&<><div className="separator">ou</div><button className="button google" onClick={()=>signIn('google',{callbackUrl:'/'})}><span className="google-g">G</span>Continuar com Google</button></>}<p className="switch-login">{register?'Já tem uma conta?':'Primeira vez por aqui?'} <button onClick={()=>{setRegister(!register);setError('');}}>{register?'Entrar':'Criar conta'}</button></p><small className="login-note">Sua próxima boa ideia começa com uma rotina organizada.</small></div></section></div>;
+}
