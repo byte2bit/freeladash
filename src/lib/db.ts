@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const globalDb = globalThis as unknown as { freelaDb?: DatabaseSync };
+const globalDb = globalThis as unknown as { freelaDb?: DatabaseSync; freelaSchemaVersion?: number };
 export function db() {
   if (!globalDb.freelaDb) {
     // Runtime-created database; never include local records in build tracing.
@@ -55,6 +55,19 @@ export function db() {
       CREATE INDEX IF NOT EXISTS invoices_user ON invoices(user_id);
     `);
     globalDb.freelaDb = connection;
+  }
+  // Apply new schema even when Fast Refresh reuses an existing connection.
+  if (globalDb.freelaSchemaVersion !== 1) {
+    globalDb.freelaDb.exec(`
+      CREATE TABLE IF NOT EXISTS timer_sessions (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        description TEXT NOT NULL, started_at INTEGER NOT NULL, stopped_at INTEGER,
+        hourly_rate INTEGER NOT NULL CHECK(hourly_rate > 0), entry_ids TEXT
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS timer_user_active ON timer_sessions(user_id) WHERE stopped_at IS NULL;
+    `);
+    globalDb.freelaSchemaVersion = 1;
   }
   return globalDb.freelaDb;
 }

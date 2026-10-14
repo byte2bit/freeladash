@@ -39,11 +39,13 @@ Em produção, **defina `AUTH_SECRET`**, `AUTH_URL` com a origem pública e as U
 
 1. Cadastre um cliente e sua tarifa por hora.
 2. Crie um projeto vinculado ao cliente.
-3. Registre a data, a descrição e a duração em horas/minutos.
+3. Abra **Timer de Horas**, selecione o projeto e descreva a tarefa. Use **START** para iniciar e **STOP** para salvar automaticamente. Para trabalhos sem cronômetro, use **Registro manual** e informe data, horas e minutos.
 4. Gere uma cobrança para um cliente e intervalo de datas.
 5. Abra o relatório, exporte CSV ou use **Imprimir / Salvar PDF**. Marque como paga quando receber.
 
 O relatório é uma cobrança de serviços, não uma nota fiscal. Não existe envio automático de email ou processamento de pagamento.
+
+O timer é persistido no banco e continua ao navegar, recarregar ou fechar o navegador. Há apenas um timer ativo por conta. A duração é calculada no servidor e arredondada para o próximo minuto (mínimo de 1 minuto); sessões que atravessam a meia-noite são separadas por dia no fuso de São Paulo. A tarifa usada é a do início da sessão. Repetir START/STOP após falhas de conexão não duplica o trabalho. A página mostra as horas de hoje com edição e exclusão; registros já cobrados continuam protegidos.
 
 ## Dados e proteção
 

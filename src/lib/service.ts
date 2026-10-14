@@ -30,6 +30,7 @@ export function mutate(user: string, resource: string, method: string, id: strin
     if (method === 'DELETE') {
       if (resource === 'invoices') throw new HttpError(405,"Cobranças emitidas não podem ser excluídas.");
       const refs = resource === 'clients' ? db().prepare("SELECT id FROM projects WHERE client_id=? LIMIT 1").get(id!) : resource === 'projects' ? db().prepare("SELECT id FROM time_entries WHERE project_id=? LIMIT 1").get(id!) : null;
+      if (resource === 'projects' && db().prepare("SELECT id FROM timer_sessions WHERE project_id=? AND stopped_at IS NULL").get(id!)) throw new HttpError(409,"Pare o timer deste projeto antes de excluí-lo.");
       if (refs) throw new HttpError(409,"Este registro possui vínculos. Mantenha-o para preservar seu histórico.");
       db().prepare(`DELETE FROM ${table} WHERE id=? AND user_id=?`).run(id!, user);
       return { success: true };
@@ -41,12 +42,13 @@ export function mutate(user: string, resource: string, method: string, id: strin
       else db().prepare("UPDATE clients SET name=?,email=?,hourly_rate=?,color=? WHERE id=? AND user_id=?").run(v.name,v.email,v.hourly_rate,v.color,key,user);
     } else if (resource === 'projects') {
       const v=projectSchema.parse(input); owned('clients',v.client_id,user);
+      if (existing && (v.status !== 'active' || v.client_id !== existing.client_id) && db().prepare("SELECT id FROM timer_sessions WHERE project_id=? AND stopped_at IS NULL").get(key)) throw new HttpError(409,"Pare o timer deste projeto antes de concluir ou trocar o cliente.");
       if (existing && existing.client_id !== v.client_id && db().prepare("SELECT id FROM time_entries WHERE project_id=? LIMIT 1").get(key)) throw new HttpError(409,"Projetos com horas registradas não podem trocar de cliente.");
       if (method==='POST') db().prepare("INSERT INTO projects(id,user_id,client_id,name,status) VALUES(?,?,?,?,?)").run(key,user,v.client_id,v.name,v.status);
       else db().prepare("UPDATE projects SET name=?,client_id=?,status=? WHERE id=? AND user_id=?").run(v.name,v.client_id,v.status,key,user);
     } else if (resource === 'entries') {
       const v=entrySchema.parse(input); const project=owned('projects',v.project_id,user);
-      if (project.status!=='active') throw new HttpError(409,"Selecione um projeto ativo.");
+      if (project.status!=='active' && (!existing || existing.project_id !== v.project_id)) throw new HttpError(409,"Selecione um projeto ativo.");
       const client=owned('clients',String(project.client_id),user);
       const rate=existing && existing.project_id===v.project_id ? Number(existing.hourly_rate) : Number(client.hourly_rate);
       if (method==='POST') db().prepare("INSERT INTO time_entries(id,user_id,project_id,description,date,minutes,hourly_rate) VALUES(?,?,?,?,?,?,?)").run(key,user,v.project_id,v.description,v.date,v.minutes,rate);
