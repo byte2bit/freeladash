@@ -74,3 +74,7 @@ Os testes usam um banco temporário separado e cobrem validação, acesso entre 
 ## Stack
 
 Next.js 16 App Router, TypeScript, React 19, Tailwind CSS 4, primitivas acessíveis Radix UI, Lucide, Auth.js (Google e Credentials), Zod, bcrypt e SQLite nativo do Node. [Documentação Next.js](https://nextjs.org/docs/app/getting-started), [Credentials](https://authjs.dev/getting-started/authentication/credentials), [SQLite do Node](https://nodejs.org/api/sqlite.html).
+
+## Uso de IA
+
+Utilizei ferramentas de IA como apoio ao desenvolvimento. As decisões de arquitetura, a revisão do código e a validação das funcionalidades ficaram sob minha responsabilidade.
