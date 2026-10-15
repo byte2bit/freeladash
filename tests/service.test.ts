@@ -36,11 +36,38 @@ test('validação, isolamento e ciclo completo de cobrança',async t=>{
   await t.test('gera total em centavos e bloqueia cobrança duplicada',()=>{
     invoice=(mutate(alice,'invoices','POST',undefined,{client_id:client.id,start_date:'2026-10-01',end_date:'2026-10-31'}) as {id:string}).id;
     const detail=invoiceDetail(alice,invoice);
+    assert.equal(detail.invoice.status,'pending');
     assert.equal(detail.invoice.total,19792);assert.equal(detail.invoice.minutes,95);assert.equal(detail.items.length,1);
     assert.equal(dashboardData(alice).entries[0].invoice_id,invoice);
     assert.throws(()=>mutate(alice,'invoices','POST',undefined,{client_id:client.id,start_date:'2026-10-01',end_date:'2026-10-31'}),e=>e instanceof HttpError&&e.status===409);
     assert.equal(dashboardData(alice).invoices.length,1);
     for(const rows of Object.values(dashboardData(alice)))for(const row of rows)assert.equal(Object.getPrototypeOf(row),Object.prototype,'Rows passed to React must be plain objects');
+  });
+  await t.test('altera entre todos os status sem modificar o relatório ou permitir acesso alheio',()=>{
+    const before=invoiceDetail(alice,invoice);
+    for(const status of ['draft','pending','paid','draft','paid','pending']) {
+      mutate(alice,'invoices','PATCH',invoice,{status});
+      assert.deepEqual(invoiceDetail(alice,invoice),{...before,invoice:{...before.invoice,status}});
+      assert.equal(dashboardData(alice).entries.find(e=>e.id===entry.id)?.invoice_id,invoice);
+    }
+    assert.throws(()=>mutate(bob,'invoices','PATCH',invoice,{status:'draft'}),e=>e instanceof HttpError&&e.status===404);
+    for(const input of [{status:'cancelled'},{status:''},{}, {status:null}]) {
+      assert.throws(()=>mutate(alice,'invoices','PATCH',invoice,input));
+      assert.equal(invoiceDetail(alice,invoice).invoice.status,'pending');
+    }
+  });
+  await t.test('gera rascunho e preserva proteção das horas e bloqueio de duplicação',()=>{
+    const draftEntry=mutate(alice,'entries','POST',undefined,{project_id:project.id,description:'Serviço em rascunho',date:'2026-09-12',minutes:60}) as {id:string};
+    const input={client_id:client.id,start_date:'2026-09-01',end_date:'2026-09-30',status:'draft'};
+    const draft=mutate(alice,'invoices','POST',undefined,input) as {id:string};
+    const detail=invoiceDetail(alice,draft.id);
+    assert.equal(detail.invoice.status,'draft');
+    assert.equal(detail.invoice.total,25000);
+    assert.equal(detail.items.length,1);
+    assert.equal(dashboardData(alice).entries.find(e=>e.id===draftEntry.id)?.invoice_id,draft.id);
+    assert.throws(()=>mutate(alice,'invoices','POST',undefined,input),e=>e instanceof HttpError&&e.status===409);
+    assert.throws(()=>mutate(alice,'entries','DELETE',draftEntry.id,null),e=>e instanceof HttpError&&e.status===409);
+    assert.throws(()=>mutate(alice,'entries','PATCH',draftEntry.id,{project_id:project.id,description:'Alterado',date:'2026-09-12',minutes:30}),e=>e instanceof HttpError&&e.status===409);
   });
   await t.test('protege registros cobrados e snapshots do relatório',()=>{
     assert.throws(()=>mutate(alice,'entries','DELETE',entry.id,null),e=>e instanceof HttpError&&e.status===409);

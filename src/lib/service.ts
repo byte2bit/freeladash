@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 import { db, transaction } from "./db";
 import { entryAmount } from "./format";
 import type { DashboardData, Entry, Invoice } from "./types";
-import { clientSchema, projectSchema, entrySchema, invoiceSchema } from "./validation";
-import { z } from "zod";
+import { clientSchema, projectSchema, entrySchema, invoiceSchema, invoiceStatusSchema } from "./validation";
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 export function dashboardData(user: string): DashboardData {
   return {
@@ -54,7 +53,7 @@ export function mutate(user: string, resource: string, method: string, id: strin
       if (method==='POST') db().prepare("INSERT INTO time_entries(id,user_id,project_id,description,date,minutes,hourly_rate) VALUES(?,?,?,?,?,?,?)").run(key,user,v.project_id,v.description,v.date,v.minutes,rate);
       else db().prepare("UPDATE time_entries SET project_id=?,description=?,date=?,minutes=?,hourly_rate=? WHERE id=? AND user_id=?").run(v.project_id,v.description,v.date,v.minutes,rate,key,user);
     } else if (method === 'PATCH') {
-      const v=z.object({ status:z.enum(['pending','paid']) }).parse(input);
+      const v=invoiceStatusSchema.parse(input);
       db().prepare("UPDATE invoices SET status=? WHERE id=? AND user_id=?").run(v.status,key,user);
     } else {
       const v=invoiceSchema.parse(input); const client=owned('clients',v.client_id,user);
@@ -64,7 +63,7 @@ export function mutate(user: string, resource: string, method: string, id: strin
       const number=`FD-${String(count).padStart(4,'0')}`;
       const total=entries.reduce((sum,e)=>sum+entryAmount(e.minutes,e.hourly_rate),0);
       const minutes=entries.reduce((sum,e)=>sum+e.minutes,0);
-      db().prepare("INSERT INTO invoices(id,user_id,client_id,number,start_date,end_date,total,minutes,client_name,client_email) VALUES(?,?,?,?,?,?,?,?,?,?)").run(key,user,v.client_id,number,v.start_date,v.end_date,total,minutes,String(client.name),String(client.email));
+      db().prepare("INSERT INTO invoices(id,user_id,client_id,number,start_date,end_date,total,minutes,client_name,client_email,status) VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(key,user,v.client_id,number,v.start_date,v.end_date,total,minutes,String(client.name),String(client.email),v.status);
       for (const e of entries) {
         db().prepare("INSERT INTO invoice_items(id,invoice_id,project_name,description,date,minutes,hourly_rate,amount) VALUES(?,?,?,?,?,?,?,?)").run(randomUUID(),key,e.project_name,e.description,e.date,e.minutes,e.hourly_rate,entryAmount(e.minutes,e.hourly_rate));
         db().prepare("UPDATE time_entries SET invoice_id=? WHERE id=? AND user_id=?").run(key,e.id,user);
@@ -73,4 +72,4 @@ export function mutate(user: string, resource: string, method: string, id: strin
     return { id: key };
   });
 }
-export function invoiceDetail(user: string,id: string) { return { invoice: owned('invoices',id,user) as unknown as Invoice, items: db().prepare("SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY date").all(id) }; }
+export function invoiceDetail(user: string,id: string) { return { invoice: { ...owned('invoices',id,user) } as unknown as Invoice, items: db().prepare("SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY date").all(id) }; }

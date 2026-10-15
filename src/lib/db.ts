@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { migrateInvoiceStatuses } from "./migrations";
 
 const globalDb = globalThis as unknown as { freelaDb?: DatabaseSync; freelaSchemaVersion?: number };
 export function db() {
@@ -32,7 +33,7 @@ export function db() {
         id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
         client_id TEXT NOT NULL REFERENCES clients(id), number TEXT NOT NULL,
         start_date TEXT NOT NULL, end_date TEXT NOT NULL, total INTEGER NOT NULL,
-        minutes INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'paid')),
+        minutes INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('draft', 'pending', 'paid')),
         client_name TEXT NOT NULL, client_email TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, number)
       );
@@ -57,7 +58,7 @@ export function db() {
     globalDb.freelaDb = connection;
   }
   // Apply new schema even when Fast Refresh reuses an existing connection.
-  if (globalDb.freelaSchemaVersion !== 1) {
+  if (globalDb.freelaSchemaVersion !== 2) {
     globalDb.freelaDb.exec(`
       CREATE TABLE IF NOT EXISTS timer_sessions (
         id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
@@ -67,7 +68,8 @@ export function db() {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS timer_user_active ON timer_sessions(user_id) WHERE stopped_at IS NULL;
     `);
-    globalDb.freelaSchemaVersion = 1;
+    migrateInvoiceStatuses(globalDb.freelaDb);
+    globalDb.freelaSchemaVersion = 2;
   }
   return globalDb.freelaDb;
 }

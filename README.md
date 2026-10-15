@@ -40,8 +40,8 @@ Em produção, **defina `AUTH_SECRET`**, `AUTH_URL` com a origem pública e as U
 1. Cadastre um cliente e sua tarifa por hora.
 2. Crie um projeto vinculado ao cliente.
 3. Abra **Timer de Horas**, selecione o projeto e descreva a tarefa. Use **START** para iniciar e **STOP** para salvar automaticamente. Para trabalhos sem cronômetro, use **Registro manual** e informe data, horas e minutos.
-4. Gere uma cobrança para um cliente e intervalo de datas.
-5. Abra o relatório, exporte CSV ou use **Imprimir / Salvar PDF**. Marque como paga quando receber.
+4. Gere uma cobrança para um cliente e intervalo de datas, escolhendo o status inicial: **Rascunho**, **Pendente** (padrão) ou **Paga**.
+5. Altere o status pelo seletor na lista de cobranças ou no relatório. Filtre por **Rascunhos**, **Pendentes** ou **Pagas**. Exporte CSV ou use **Imprimir / Salvar PDF**.
 
 O relatório é uma cobrança de serviços, não uma nota fiscal. Não existe envio automático de email ou processamento de pagamento.
 
@@ -53,6 +53,7 @@ O timer é persistido no banco e continua ao navegar, recarregar ou fechar o nav
 - Valores monetários em centavos; duração em minutos inteiros, até 24 horas por registro. Subtotais arredondados por registro.
 - Cada registro armazena sua própria tarifa. Alterar a tarifa de um cliente não altera o histórico.
 - Cobranças são geradas em transação. Apenas registros ainda não cobrados entram; intervalos sobrepostos não duplicam horas.
+- Rascunhos reservam e protegem as horas vinculadas, preservando o relatório. É possível mudar livremente entre rascunho, pendente e paga. Somente pendentes entram no total **A receber**. Bancos existentes recebem a atualização dos status automaticamente, preservando dados e vínculos.
 - Horas cobradas não podem ser alteradas ou excluídas. Relatórios preservam nomes, descrições e tarifas mesmo após alterações cadastrais.
 - Login obrigatório nas páginas do app, APIs e exportações. Todas as consultas e alterações verificam o usuário proprietário.
 - Zod valida as APIs; SQL usa parâmetros; senhas usam bcrypt; sessões são cookies JWT gerenciados pelo Auth.js. APIs de escrita verificam a origem; tentativas de login e cadastro têm limitação persistida no SQLite.
@@ -77,4 +78,4 @@ Next.js 16 App Router, TypeScript, React 19, Tailwind CSS 4, primitivas acessív
 
 ## Uso de IA
 
-Utilizei ferramentas de IA como apoio ao desenvolvimento. As decisões de arquitetura, a revisão do código e a validação das funcionalidades ficaram sob minha responsabilidade.
+Utilizei ferramentas de IA como apoio ao desenvolvimento (AI-Assisted Development). As decisões de arquitetura, a revisão do código e a validação das funcionalidades ficaram sob minha responsabilidade.

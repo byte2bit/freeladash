@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { invoiceStatuses } from "./invoice-status";
 const name = z.string().trim().min(2, "Informe ao menos 2 caracteres.").max(120);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => { const d = new Date(`${v}T12:00:00Z`); return !isNaN(d.getTime()) && d.toISOString().slice(0,10) === v; }, "Data inválida.");
 export const registrationSchema = z.object({ name, email: z.email({error:"Informe um email válido."}).max(254).transform(v=>v.toLowerCase()), password: z.string().min(8, "Use ao menos 8 caracteres.").max(72,"Esta senha é longa demais. Use uma senha menor.").refine(v=>new TextEncoder().encode(v).length<=72,"Esta senha é longa demais. Use uma senha menor.") });
@@ -7,4 +8,5 @@ export const clientSchema = z.object({ name, email: z.email({error:"Informe um e
 export const projectSchema = z.object({ name, client_id: z.uuid(), status: z.enum(["active", "completed"]).default("active") });
 export const entrySchema = z.object({ project_id: z.uuid({error:"Selecione um projeto válido."}), description: z.string().trim().min(3,"Descreva o trabalho com ao menos 3 caracteres.").max(1000), date, minutes: z.number().int().min(1,"Informe ao menos 1 minuto de trabalho.").max(1440,"Cada registro pode ter no máximo 24 horas.") });
 export const timerSchema = entrySchema.pick({ project_id: true, description: true }).extend({ id: z.uuid() });
-export const invoiceSchema = z.object({ client_id: z.uuid(), start_date: date, end_date: date }).refine(v=>v.start_date<=v.end_date, "O início deve ser anterior ao fim.");
+export const invoiceStatusSchema = z.object({ status: z.enum(invoiceStatuses) });
+export const invoiceSchema = z.object({ client_id: z.uuid(), start_date: date, end_date: date, status: invoiceStatusSchema.shape.status.default("pending") }).refine(v=>v.start_date<=v.end_date, "O início deve ser anterior ao fim.");
