@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { signIn } from "next-auth/react";
+import { getCsrfToken, signIn } from "next-auth/react";
 import { ArrowRight, ChartNoAxesCombined, Check, Layers3, Loader2 } from "lucide-react";
 export function Login({googleEnabled}:{googleEnabled:boolean}) {
   const [register,setRegister]=useState(false); const [error,setError]=useState(''); const [busy,setBusy]=useState(false);
@@ -8,7 +8,7 @@ export function Login({googleEnabled}:{googleEnabled:boolean}) {
   async function submit(e:React.FormEvent<HTMLFormElement>) {
     e.preventDefault();setBusy(true);setError('');const values=Object.fromEntries(new FormData(e.currentTarget));
     try {
-      if (register) { const response=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});const body=await response.json();if(!response.ok) throw new Error(body.error); }
+      if (register) { const csrfToken=await getCsrfToken();if(!csrfToken)throw new Error('Não foi possível iniciar o cadastro. Recarregue a página.');const response=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken},body:JSON.stringify(values)});const body=await response.json();if(!response.ok) throw new Error(body.error); }
       const result=await signIn('credentials',{email:values.email,password:values.password,redirect:false});
       if(result?.error) throw new Error('Email ou senha inválidos. Confira os dados ou tente mais tarde.');
       window.location.href='/';

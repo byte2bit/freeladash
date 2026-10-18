@@ -23,7 +23,8 @@ test('validação, isolamento e ciclo completo de cobrança',async t=>{
     assert.equal(registrationSchema.safeParse({name:'Teste',email:'teste@example.com',password:'🔐'.repeat(20)}).success,false);
   });
   await t.test('não permite acessar nem vincular dados de outro usuário',()=>{
-    assert.deepEqual(dashboardData(bob),{clients:[],projects:[],entries:[],invoices:[]});
+    const empty=dashboardData(bob,{month:'2026-10'});
+    for(const resource of ['clients','projects','entries','invoices'] as const)assert.deepEqual(empty[resource],[]);
     assert.throws(()=>mutate(bob,'clients','PATCH',client.id,{name:'Outro cliente',email:'outro@example.com',hourly_rate:10000}),e=>e instanceof HttpError&&e.status===404);
     assert.throws(()=>mutate(bob,'projects','POST',undefined,{name:'Projeto alheio',client_id:client.id}),e=>e instanceof HttpError&&e.status===404);
     assert.throws(()=>mutate(bob,'entries','POST',undefined,{project_id:project.id,description:'Teste',date:'2026-10-12',minutes:60}),e=>e instanceof HttpError&&e.status===404);
@@ -41,7 +42,8 @@ test('validação, isolamento e ciclo completo de cobrança',async t=>{
     assert.equal(dashboardData(alice).entries[0].invoice_id,invoice);
     assert.throws(()=>mutate(alice,'invoices','POST',undefined,{client_id:client.id,start_date:'2026-10-01',end_date:'2026-10-31'}),e=>e instanceof HttpError&&e.status===409);
     assert.equal(dashboardData(alice).invoices.length,1);
-    for(const rows of Object.values(dashboardData(alice)))for(const row of rows)assert.equal(Object.getPrototypeOf(row),Object.prototype,'Rows passed to React must be plain objects');
+    const data=dashboardData(alice,{month:'2026-10'});
+    for(const resource of ['clients','projects','entries','invoices'] as const)for(const row of data[resource])assert.equal(Object.getPrototypeOf(row),Object.prototype,'Rows passed to React must be plain objects');
   });
   await t.test('altera entre todos os status sem modificar o relatório ou permitir acesso alheio',()=>{
     const before=invoiceDetail(alice,invoice);
@@ -64,7 +66,7 @@ test('validação, isolamento e ciclo completo de cobrança',async t=>{
     assert.equal(detail.invoice.status,'draft');
     assert.equal(detail.invoice.total,25000);
     assert.equal(detail.items.length,1);
-    assert.equal(dashboardData(alice).entries.find(e=>e.id===draftEntry.id)?.invoice_id,draft.id);
+    assert.equal(dashboardData(alice,{month:'2026-09'}).entries.find(e=>e.id===draftEntry.id)?.invoice_id,draft.id);
     assert.throws(()=>mutate(alice,'invoices','POST',undefined,input),e=>e instanceof HttpError&&e.status===409);
     assert.throws(()=>mutate(alice,'entries','DELETE',draftEntry.id,null),e=>e instanceof HttpError&&e.status===409);
     assert.throws(()=>mutate(alice,'entries','PATCH',draftEntry.id,{project_id:project.id,description:'Alterado',date:'2026-09-12',minutes:30}),e=>e instanceof HttpError&&e.status===409);

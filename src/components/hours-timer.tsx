@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Clock3, Loader2, Play, Square } from "lucide-react";
 import type { Project, Timer } from "@/lib/types";
+import { CatalogControls, useCatalog } from "./catalog";
 
 async function timerRequest(path: string, body?: unknown) {
   const response = await fetch(path, body === undefined ? { cache: "no-store" } : {
@@ -69,7 +70,8 @@ export function HoursTimer({ initialTimer, projects, visible, open, onSaved, onN
   }, []);
 
   const seconds = timer && now ? Math.max(0, Math.floor((now + offset - timer.started_at) / 1000)) : 0;
-  const active = projects.filter(value => value.status === "active");
+  const catalog=useCatalog("projects",visible,[],projects,"active");
+  const active = catalog.projects.filter(value => value.status === "active");
   async function act(event: React.FormEvent) {
     event.preventDefault();
     if (pending.current) return;
@@ -96,10 +98,10 @@ export function HoursTimer({ initialTimer, projects, visible, open, onSaved, onN
   return <section className={`panel timer-panel ${timer ? "is-running" : ""}`} aria-label="Cronômetro de trabalho">
     <div className="panel-heading"><div><h2>Seu tempo, no projeto certo</h2><p>Escolha o projeto, descreva a tarefa e comece.</p></div><span className={`badge ${timer ? "green" : "gray"}`}>{timer && <i/>}{timer ? "Em andamento" : "Pronto para começar"}</span></div>
     <form className="timer-form" onSubmit={act}>
-      <div className="timer-fields"><label htmlFor="timer-project">Projeto<select id="timer-project" required value={timer?.project_id || project} disabled={Boolean(timer) || busy || !ready} onChange={event => setProject(event.target.value)}><option value="" disabled>Selecione um projeto</option>{projects.filter(value => value.status === "active" || value.id === timer?.project_id).map(value => <option key={value.id} value={value.id}>{value.name} · {value.client_name}</option>)}</select></label>
+      <CatalogControls catalog={catalog} label="projetos"/><div className="timer-fields"><label htmlFor="timer-project">Projeto<select id="timer-project" required value={timer?.project_id || project} disabled={Boolean(timer) || busy || !ready} onChange={event => setProject(event.target.value)}><option value="" disabled>Selecione um projeto</option>{(timer?.project_id||project)&&!catalog.projects.some(value=>value.id===(timer?.project_id||project))&&<option value={timer?.project_id||project}>{timer?.project_name||projects.find(value=>value.id===project)?.name||"Projeto selecionado"}</option>}{catalog.projects.filter(value => value.status === "active" || value.id === timer?.project_id).map(value => <option key={value.id} value={value.id}>{value.name} · {value.client_name}</option>)}</select></label>
       <label htmlFor="timer-description">O que você está fazendo?<textarea id="timer-description" required minLength={3} maxLength={1000} rows={2} value={timer?.description ?? description} disabled={Boolean(timer) || busy || !ready} onChange={event => setDescription(event.target.value)} placeholder="Ex.: Desenvolvimento da página inicial"/></label></div>
-      <div className="timer-controls"><span className="timer-caption">{timer ? "TEMPO EM ANDAMENTO" : "CRONÔMETRO"}</span><output className="timer-clock" aria-label="Tempo decorrido" aria-live="off">{elapsedLabel(seconds)}</output><button className={`button timer-button ${timer ? "danger" : "primary"}`} disabled={busy || !ready || (!timer && !active.length)}>{busy ? <Loader2 size={19} className="spin"/> : timer ? <Square size={17} fill="currentColor"/> : <Play size={18} fill="currentColor"/>}{busy ? "Salvando..." : timer ? "STOP" : "START"}</button><p>{timer ? "Ao parar, suas horas são salvas automaticamente." : "Tudo pronto? Dê START e foque no trabalho."}</p></div>
-      {!active.length && !timer && <div className="timer-empty-note">Você precisa de um projeto ativo para começar. <button type="button" className="text-link" onClick={onNewProject}>Criar projeto</button></div>}
+      <div className="timer-controls"><span className="timer-caption">{timer ? "TEMPO EM ANDAMENTO" : "CRONÔMETRO"}</span><output className="timer-clock" aria-label="Tempo decorrido" aria-live="off">{elapsedLabel(seconds)}</output><button className={`button timer-button ${timer ? "danger" : "primary"}`} disabled={busy || !ready || (!timer && !project)}>{busy ? <Loader2 size={19} className="spin"/> : timer ? <Square size={17} fill="currentColor"/> : <Play size={18} fill="currentColor"/>}{busy ? "Salvando..." : timer ? "STOP" : "START"}</button><p>{timer ? "Ao parar, suas horas são salvas automaticamente." : "Tudo pronto? Dê START e foque no trabalho."}</p></div>
+      {!active.length && !timer && !project && <div className="timer-empty-note">Você precisa de um projeto ativo para começar. <button type="button" className="text-link" onClick={onNewProject}>Criar projeto</button></div>}
       {error && <p className="form-error" role="alert">{error}</p>}
       {needsRefresh && <button type="button" className="button" onClick={async () => { try { await onSaved(); setNeedsRefresh(false); setError(""); } catch { setError("Não foi possível atualizar os registros. Tente novamente."); } }}>Atualizar registros</button>}
     </form><div className="timer-footer"><Clock3 size={14}/><span>O timer continua ao sair desta página. Duração salva em minutos, arredondada para cima.</span></div>

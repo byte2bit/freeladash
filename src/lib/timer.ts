@@ -3,13 +3,14 @@ import { db, transaction } from "./db";
 import { HttpError } from "./service";
 import type { Timer } from "./types";
 import { timerSchema } from "./validation";
+import { timerModel } from "./models";
 
 export function activeTimer(user: string): Timer | null {
   const row = db().prepare(`SELECT t.id, t.project_id, t.description, t.started_at,
     p.name project_name, c.name client_name, c.color FROM timer_sessions t
     JOIN projects p ON p.id=t.project_id JOIN clients c ON c.id=p.client_id
     WHERE t.user_id=? AND t.stopped_at IS NULL`).get(user);
-  return row ? { ...row } as unknown as Timer : null;
+  return row ? timerModel.parse(row) : null;
 }
 
 export function startTimer(user: string, input: unknown) {

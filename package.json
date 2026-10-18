@@ -8,7 +8,8 @@
     "start": "next start",
     "seed": "tsx scripts/seed.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "test:http": "node scripts/checkup-smoke.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

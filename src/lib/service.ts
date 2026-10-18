@@ -1,18 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { db, transaction } from "./db";
 import { entryAmount } from "./format";
-import type { DashboardData, Entry, Invoice } from "./types";
+import { z } from "zod";
+import { invoiceItemModel, invoiceModel } from "./models";
 import { clientSchema, projectSchema, entrySchema, invoiceSchema, invoiceStatusSchema } from "./validation";
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
-export function dashboardData(user: string): DashboardData {
-  return {
-    // node:sqlite returns null-prototype rows. React Server Components require plain objects.
-    clients: db().prepare("SELECT * FROM clients WHERE user_id=? ORDER BY name").all(user).map(row=>({...row})),
-    projects: db().prepare("SELECT p.*, c.name client_name, c.color, c.hourly_rate FROM projects p JOIN clients c ON c.id=p.client_id WHERE p.user_id=? ORDER BY p.created_at DESC, p.name").all(user).map(row=>({...row})),
-    entries: db().prepare("SELECT t.*, p.name project_name, c.name client_name, c.id client_id, c.color FROM time_entries t JOIN projects p ON p.id=t.project_id JOIN clients c ON c.id=p.client_id WHERE t.user_id=? ORDER BY t.date DESC, t.created_at DESC").all(user).map(row=>({...row})),
-    invoices: db().prepare("SELECT * FROM invoices WHERE user_id=? ORDER BY created_at DESC").all(user).map(row=>({...row})),
-  } as unknown as DashboardData;
-}
+export { dashboardData } from "./dashboard-data";
 function owned(table: string, id: string, user: string) {
   // table is always a literal from our own code, never request input.
   const row = db().prepare(`SELECT * FROM ${table} WHERE id=? AND user_id=?`).get(id,user);
@@ -57,7 +50,7 @@ export function mutate(user: string, resource: string, method: string, id: strin
       db().prepare("UPDATE invoices SET status=? WHERE id=? AND user_id=?").run(v.status,key,user);
     } else {
       const v=invoiceSchema.parse(input); const client=owned('clients',v.client_id,user);
-      const entries=db().prepare("SELECT t.*, p.name project_name FROM time_entries t JOIN projects p ON p.id=t.project_id WHERE t.user_id=? AND p.client_id=? AND t.date BETWEEN ? AND ? AND t.invoice_id IS NULL ORDER BY t.date").all(user,v.client_id,v.start_date,v.end_date) as unknown as Entry[];
+      const entries=z.array(z.object({id:z.string(),project_name:z.string(),description:z.string(),date:z.string(),minutes:z.number(),hourly_rate:z.number()})).parse(db().prepare("SELECT t.*, p.name project_name FROM time_entries t JOIN projects p ON p.id=t.project_id WHERE t.user_id=? AND p.client_id=? AND t.date BETWEEN ? AND ? AND t.invoice_id IS NULL ORDER BY t.date").all(user,v.client_id,v.start_date,v.end_date));
       if (!entries.length) throw new HttpError(409,"Nenhuma hora disponível para cobrar neste período.");
       const count=Number(db().prepare("SELECT COUNT(*) n FROM invoices WHERE user_id=?").get(user)!.n)+1;
       const number=`FD-${String(count).padStart(4,'0')}`;
@@ -72,4 +65,4 @@ export function mutate(user: string, resource: string, method: string, id: strin
     return { id: key };
   });
 }
-export function invoiceDetail(user: string,id: string) { return { invoice: { ...owned('invoices',id,user) } as unknown as Invoice, items: db().prepare("SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY date").all(id) }; }
+export function invoiceDetail(user: string,id: string) { return { invoice: invoiceModel.parse(owned('invoices',id,user)), items: invoiceItemModel.array().parse(db().prepare("SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY date").all(id)) }; }

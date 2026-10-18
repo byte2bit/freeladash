@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { HttpError } from "./service";
 import { ZodError } from "zod";
+import { PasswordBusyError } from "./password";
 export async function apiUser(request: Request, write=false) {
   if (write) sameOrigin(request);
   const session=await auth();
@@ -13,6 +14,7 @@ export function sameOrigin(request: Request) {
   if (!origin || origin!==expected) throw new HttpError(403,"Origem da requisição inválida.");
 }
 export function apiError(error: unknown) {
+  if (error instanceof PasswordBusyError) return Response.json({error:error.message},{status:429,headers:{"Retry-After":"5"}});
   if (error instanceof ZodError) return Response.json({ error:error.issues.map(i=>i.message).join(' ') },{status:400});
   if (error instanceof HttpError) return Response.json({error:error.message},{status:error.status});
   if (error instanceof SyntaxError) return Response.json({error:"JSON inválido."},{status:400});

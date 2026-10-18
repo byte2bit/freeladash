@@ -166,3 +166,11 @@
   }
   .invoice-paper a[href]:after { content: none; }
 }
+
+.pagination-controls{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;margin:24px 0;color:var(--muted);font-size:12px}
+.catalog-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:14px;min-width:0}
+.catalog-controls label{display:flex;flex:1;flex-direction:column;gap:8px;min-width:160px;max-width:420px;margin:0;font-size:12px;color:#776c88}
+.catalog-controls input{width:100%;min-width:0;border:1px solid #e3e3ec;border-radius:7px;background:#fff;padding:10px 12px;color:var(--ink)}
+.catalog-controls small{color:var(--muted)}
+.timer-form>.catalog-controls{grid-column:1/-1;margin:0}
+.table-wrap{position:relative}

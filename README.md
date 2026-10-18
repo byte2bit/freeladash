@@ -29,17 +29,21 @@ Para habilitar Google, copie `.env.example` para `.env.local`, crie um cliente O
 - Origem JavaScript: `http://localhost:3000`
 - URI de redirecionamento: `http://localhost:3000/api/auth/callback/google`
 
-Reinicie o servidor. O botão Google aparece apenas quando as credenciais estão configuradas. O fluxo exige email verificado pelo Google; login por esse email reutiliza o usuário existente. [Referência do provider](https://authjs.dev/reference/core/providers/google).
+Reinicie o servidor. O botão Google aparece apenas quando as credenciais estão configuradas. O fluxo exige email verificado pelo Google e identifica a conta pelo identificador estável do provider. Um email igual ao de uma conta local **não vincula as contas automaticamente**: nesse caso, use o login por senha da conta local. Contas que já tinham Google vinculado passam a aceitar somente Google. Sessões anteriores à correção exigem novo login. [Referência do provider](https://authjs.dev/reference/core/providers/google).
 
 Em produção, **defina `AUTH_SECRET`**, `AUTH_URL` com a origem pública e as URLs correspondentes no Google Cloud. Gere um segredo com `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Execute `npm run build` e `npm start` em um host Node com armazenamento persistente. O build não precisa de credenciais Google. Este projeto usa SQLite em arquivo e não é adequado a hosts com filesystem efêmero ou múltiplas instâncias independentes. Não use a conta de demonstração no ambiente de produção.
 
 `DATABASE_PATH` opcional altera o local do banco; por padrão ele fica em `data/freeladash.sqlite`. Faça backup do banco com o servidor parado (ou use a API de backup SQLite). Não versione `data/` ou arquivos de ambiente.
 
+As tentativas de cadastro/login são limitadas por dispositivo usando o cookie CSRF assinado do Auth.js e, no login, também pelo par dispositivo/conta. Requisições de cadastro inválidas não consomem a quota de todos os usuários. Para limitar por IP em produção, configure `AUTH_RATE_LIMIT_IP_HEADER=x-real-ip` **somente se um proxy confiável sobrescrever esse header com um único IP validado e impedir acesso direto ao servidor**. Por padrão, headers de IP enviados pelo cliente são ignorados; a quota por dispositivo não substitui limites de tráfego no proxy. O bcrypt usa dois workers com fila limitada, preservando compatibilidade com os hashes existentes sem bloquear o event loop das requisições.
+
+As listagens têm páginas de até 50 itens e pesquisa no servidor. Totais e gráficos são agregados no banco, independentemente da página. Os seletores de cliente/projeto têm busca e carregamento de mais opções; a prévia de cobrança usa todos os registros elegíveis do período. Novos índices são criados automaticamente ao abrir o banco, sem remover registros.
+
 ## Fluxo de trabalho
 
 1. Cadastre um cliente e sua tarifa por hora.
 2. Crie um projeto vinculado ao cliente.
-3. Abra **Timer de Horas**, selecione o projeto e descreva a tarefa. Use **START** para iniciar e **STOP** para salvar automaticamente. Para trabalhos sem cronômetro, use **Registro manual** e informe data, horas e minutos.
+3. Na página inicial (**Visão geral**), use o widget do timer: selecione o projeto e descreva a tarefa. Use **START** para iniciar e **STOP** para salvar automaticamente. O mesmo timer está disponível em **Timer de Horas**. Para trabalhos sem cronômetro, use **Registro manual** nessa seção e informe data, horas e minutos.
 4. Gere uma cobrança para um cliente e intervalo de datas, escolhendo o status inicial: **Rascunho**, **Pendente** (padrão) ou **Paga**.
 5. Altere o status pelo seletor na lista de cobranças ou no relatório. Filtre por **Rascunhos**, **Pendentes** ou **Pagas**. Exporte CSV ou use **Imprimir / Salvar PDF**.
 
@@ -65,12 +69,13 @@ O timer é persistido no banco e continua ao navegar, recarregar ou fechar o nav
 npm run typecheck
 npm test
 npm run build
+npm run test:http
 npm audit
 # Com o servidor de desenvolvimento aberto e o seed já criado:
 node scripts/smoke.mjs
 ```
 
-Os testes usam um banco temporário separado e cobrem validação, acesso entre usuários, histórico de tarifas, cálculos, cobranças duplicadas e proteção dos relatórios. O smoke testa login e APIs reais, cria registros fictícios e remove somente os registros que ele próprio criou.
+Os testes usam bancos temporários separados e cobrem validação, acesso entre usuários, histórico de tarifas, cálculos, cobranças duplicadas, autenticação, paginação, agregados e índices. Após o build, `npm run test:http` inicia seu próprio servidor de produção com banco descartável e testa cadastro, cookies, sessão, APIs, paginação, cobrança e CSV. O smoke manual antigo continua disponível para um servidor já aberto; ele cria registros fictícios e remove somente os registros que ele próprio criou.
 
 ## Stack
 

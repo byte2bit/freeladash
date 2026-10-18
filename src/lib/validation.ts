@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { invoiceStatuses } from "./invoice-status";
+import { today } from "./format";
+import { viewModel } from "./models";
 const name = z.string().trim().min(2, "Informe ao menos 2 caracteres.").max(120);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => { const d = new Date(`${v}T12:00:00Z`); return !isNaN(d.getTime()) && d.toISOString().slice(0,10) === v; }, "Data inválida.");
 export const registrationSchema = z.object({ name, email: z.email({error:"Informe um email válido."}).max(254).transform(v=>v.toLowerCase()), password: z.string().min(8, "Use ao menos 8 caracteres.").max(72,"Esta senha é longa demais. Use uma senha menor.").refine(v=>new TextEncoder().encode(v).length<=72,"Esta senha é longa demais. Use uma senha menor.") });
@@ -10,3 +12,12 @@ export const entrySchema = z.object({ project_id: z.uuid({error:"Selecione um pr
 export const timerSchema = entrySchema.pick({ project_id: true, description: true }).extend({ id: z.uuid() });
 export const invoiceStatusSchema = z.object({ status: z.enum(invoiceStatuses) });
 export const invoiceSchema = z.object({ client_id: z.uuid(), start_date: date, end_date: date, status: invoiceStatusSchema.shape.status.default("pending") }).refine(v=>v.start_date<=v.end_date, "O início deve ser anterior ao fim.");
+const page = z.coerce.number().int().min(1).max(100000).default(1);
+export const dashboardQuerySchema = z.object({
+  month: z.string().regex(/^[1-9]\d{3}-(0[1-9]|1[0-2])$/).default(() => today().slice(0,7)),
+  view: viewModel.default("overview"), page,
+  q: z.string().trim().max(120).default(""),
+  status: z.enum(["all", "active", "completed", "billed", "unbilled", "draft", "pending", "paid"]).default("all"),
+});
+export const catalogQuerySchema = z.object({ resource: z.enum(["clients", "projects"]), q: z.string().trim().max(120).default(""), page, status:z.enum(["all","active","completed"]).default("all") });
+export const previewQuerySchema = z.object({client_id:z.uuid(),start_date:date,end_date:date}).refine(v=>v.start_date<=v.end_date,"O início deve ser anterior ao fim.");

@@ -58,7 +58,10 @@ export function db() {
     globalDb.freelaDb = connection;
   }
   // Apply new schema even when Fast Refresh reuses an existing connection.
-  if (globalDb.freelaSchemaVersion !== 2) {
+  if (globalDb.freelaSchemaVersion !== 4) {
+    globalDb.freelaDb.function("search_text", { deterministic: true }, value => String(value ?? "").toLocaleLowerCase("pt-BR"));
+    // Rebuilding a legacy invoices table drops its indexes; add ours afterwards.
+    migrateInvoiceStatuses(globalDb.freelaDb);
     globalDb.freelaDb.exec(`
       CREATE TABLE IF NOT EXISTS timer_sessions (
         id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
@@ -67,9 +70,15 @@ export function db() {
         hourly_rate INTEGER NOT NULL CHECK(hourly_rate > 0), entry_ids TEXT
       );
       CREATE UNIQUE INDEX IF NOT EXISTS timer_user_active ON timer_sessions(user_id) WHERE stopped_at IS NULL;
+      CREATE INDEX IF NOT EXISTS projects_client ON projects(client_id);
+      CREATE INDEX IF NOT EXISTS entries_project ON time_entries(project_id);
+      CREATE INDEX IF NOT EXISTS invoice_items_invoice_date ON invoice_items(invoice_id, date);
+      CREATE INDEX IF NOT EXISTS timer_project_active ON timer_sessions(project_id) WHERE stopped_at IS NULL;
+      CREATE INDEX IF NOT EXISTS auth_attempts_expires ON auth_attempts(expires);
+      CREATE INDEX IF NOT EXISTS entries_user_order ON time_entries(user_id, date DESC, created_at DESC, id DESC);
+      CREATE INDEX IF NOT EXISTS invoices_user_created ON invoices(user_id, created_at DESC, id DESC);
     `);
-    migrateInvoiceStatuses(globalDb.freelaDb);
-    globalDb.freelaSchemaVersion = 2;
+    globalDb.freelaSchemaVersion = 4;
   }
   return globalDb.freelaDb;
 }
@@ -78,11 +87,11 @@ export function transaction<T>(fn: () => T): T {
   try { const result = fn(); db().exec("COMMIT"); return result; }
   catch (error) { db().exec("ROLLBACK"); throw error; }
 }
-export function allowAuth(key: string): boolean {
+export function allowAuth(key: string, limit = 10): boolean {
   const now = Date.now();
   db().prepare("DELETE FROM auth_attempts WHERE expires < ?").run(now);
   const row = db().prepare("SELECT count FROM auth_attempts WHERE key = ?").get(key);
-  if (row && Number(row.count) >= 10) return false;
+  if (row && Number(row.count) >= limit) return false;
   db().prepare("INSERT INTO auth_attempts(key, count, expires) VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1").run(key, now + 15 * 60 * 1000);
   return true;
 }
